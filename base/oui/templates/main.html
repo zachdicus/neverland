@@ -1,0 +1,12 @@
+{% extends "layout.html" %}
+{% block body %}
+  <h1>Sources:</h1>
+<ul class="sources">
+  {% for source in sources %}
+    <li><h2>{{ source.name }}</h2>{{ source.description}}
+  {% else %}
+    <li><em>Unbelievable.  No entries here so far</em>
+  {% endfor %}
+  </ul>
+
+{% endblock %}

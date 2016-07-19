@@ -22,16 +22,16 @@ session = Session()
 
 @app.route("/")
 def hello():
-    #for source in session.query(NeverSource):
-    #    print "test"
+    sources = list()
+    for source in session.query(NeverSource):
+        sources.append(source)
 
-    #return str(app.root_path)
-    return render_template('main.html')
+    return render_template('main.html', sources=sources)
 
 
-@app.errorhandler(404)
-def page_not_found(e):
-    return render_template("404.html")
+#@app.errorhandler(404)
+#def page_not_found(e):
+#    return render_template("404.html")
 
 if __name__ == "__main__":
     app.run()
