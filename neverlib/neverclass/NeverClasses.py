@@ -33,6 +33,10 @@ class NeverSource(Base):
     def __init__(self, sourceId):
         self.sourceId = sourceId
 
+    def insert_stats(self, session, nodeId, size, time):
+        stats= NeverSourceSize(self.sourceId, nodeId, size, time)
+        session.merge(stats)
+
     def __repr__(self):
         return "<Source(SourceId='%d', Name='%s', Description='%s', IsActive='%d', Priority='%d', Schema='%s'," \
                "Database(Host='%s', Port='%s', Username='%s', Password='%s'), " \
@@ -65,16 +69,23 @@ class NeverSource(Base):
             for col in col_dict[self.name]:
                 row[col] = result[col]
             data[result[primaryKey]] = row
-        print str(i)
-        print len(data)
+            if (i == 1):
+                print result[primaryKey]
+        #print str(i)
+        #print len(data)
         for join_source in self.joinSources:
+            # FIX ME ABSENT COLUMNS
+            #print (join_source)
             join_query = text("Select %s from %s" % (column_list[join_source.name], join_source.tableName))
-            if join_source.source is not self:
-                local_engine = create_engine(join_source.source.build_connection_string())
-                results = local_engine.execute(join_query).fetchall()
-                local_engine.dispose()
-            else:
-                results = engine.execute(join_query).fetchall()
+            #if join_source.source is not self:
+            con_str = join_source.build_connection_string()
+            #print con_str
+            local_engine = create_engine(con_str)
+            results = local_engine.execute(join_query).fetchall()
+            local_engine.dispose()
+            #else:
+            #print str(engine)
+            #    results = engine.execute(join_query).fetchall()
 
             for result in results:
                 pk = result[join_source.primaryKey]
@@ -88,6 +99,10 @@ class NeverSource(Base):
         return ("%s://%s:%s@%s:%s/%s" % (self.sourceType.alchemyType, self.database.username,
                                          self.database.password, self.database.host,
                                          self.database.port, self.schema))
+
+    @staticmethod
+    def create_connection_string(engine_type, username, password, host, port, schema):
+        return "%s://%s:%s@%s:%s/%s" % (engine_type, username, password, host, port, schema)
 
     @staticmethod
     def build_column_list(columns):
@@ -195,9 +210,27 @@ class NeverJoinSource(Base):
     joinKey = relationship("NeverColumn", foreign_keys="[NeverJoinSource.joinKeyId]")
     dbId = Column("DbId", Integer, ForeignKey("Database.DbId"))
     database = relationship("NeverDatabase", foreign_keys="[NeverJoinSource.dbId]")
+    sourceTypeId = Column("SourceTypeId", Integer, ForeignKey("SourceType.SourceTypeId"))
+    sourceType = relationship("NeverSourceType", foreign_keys="[NeverJoinSource.sourceTypeId]")
+    schema = Column("Schema", String)
 
     def __init__(self, source_type_id):
         self.sourceTypeId = source_type_id
+
+    def __repr__(self):
+        return "<JoinSource(SourceId='%d', Name='%s', Description='%s', IsActive='%d', Priority='%d', Schema='%s'," \
+               "Database(Host='%s', Port='%s', Username='%s', Password='%s'), " \
+               "SourceTpe(Name='%s', AlchemyType='%s', Description='%s'))>" % (self.sourceId, self.name,
+                                                                               self.description, 1,
+                                                                               1, 1,
+                                                                               self.database.host, self.database.port,
+                                                                               self.database.username, self.database.password,
+                                                                               self.sourceType.name, self.sourceType.alchemyType,
+                                                                               self.sourceType.description)
+    def build_connection_string(self):
+        return ("%s://%s:%s@%s:%s/%s" % (self.sourceType.alchemyType, self.database.username,
+                                         self.database.password, self.database.host,
+                                         self.database.port, self.schema))
 
 
 class NeverSourceSize(Base):
@@ -206,8 +239,11 @@ class NeverSourceSize(Base):
     nodeId = Column("NodeId", Integer, primary_key=True)
     sourceId = Column("SourceId", Integer, primary_key=True)
     size = Column("Size", Integer)
+    timing = Column("Timing", Integer)
 
-    def __init__(self, sourceId, nodeId, size):
+    def __init__(self, sourceId, nodeId, size, timing):
         self.sourceId = sourceId
         self.nodeId = nodeId
         self.size = size
+        self.timing = timing
+

@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-import neverlib.neverio.nevercomm.never_communication as ncom
 import json
-import neverlib.neverclass.NeverClasses as nc
 
+import neverlib.neverclass.NeverClasses as nc
+import neverlib.nevercomm.never_communication as ncom
 
 # Connect to the port and start listening for requests
 comms = ncom.NeverCommunication('localhost', 10000)
