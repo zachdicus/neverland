@@ -1,11 +1,12 @@
 #!/usr/bin/env python2.7
-import json
+import json as json
+import msgpack
 import logging
 import os
 import sys
 import time
 from multiprocessing import Process, Manager
-
+import pandas
 from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker
 
@@ -14,7 +15,7 @@ from neverlib.neverclass.NeverClasses import NeverSource, NeverNode
 from neverlib.neverconfig.neverconfig import NeverConfig
 
 
-def query_sources(data, lock, config, logger):
+def query_sources(ns, lock, config, logger):
     # Create the connection string
     connection_string = NeverSource.create_connection_string(config.type, config.username, config.password,
                                                              config.host, config.port, config.schema)
@@ -36,12 +37,13 @@ def query_sources(data, lock, config, logger):
                                                             NeverSource.secondaryNodeId == nodes[0].nodeId)):
             # Keep track of the time it takes to query each source
             start_time = time.time()
-            local_data = source.query()
+            local_data, filters = source.query()
+            print type(local_data)
             lock.acquire()
-            data[source.name] = local_data
+            ns.data = local_data
             lock.release()
             seconds = time.time() - start_time
-            size = sys.getsizeof(data[source.name])
+            size = sys.getsizeof(ns.data)
 
             # Save the source statistics
             source.insert_stats(session, nodes[0].nodeId, size, seconds)
@@ -55,7 +57,7 @@ def query_sources(data, lock, config, logger):
         session.close()
 
 
-def messages(data, lock, logger):
+def messages(ns,lock, logger):
     # Connect to the port and start listening for requests
     comms = ncom.NeverCommunication('localhost', 10000)
     comms.start_listening()
@@ -64,11 +66,26 @@ def messages(data, lock, logger):
     while True:
         print "What now %d" % i
 
-        local = json.loads(comms.wait_for_message())
+        msg = comms.wait_for_message()
+        print time.time()
+        #local = json.loads(msg)
+        #print time.time()
+        columns = list(ns.data.columns.values)
+        print "Sorting"
+        print time.time()
+        s1=ns.data.sort_values(columns[4])
+        print s1.index.values
+        print time.time()
+
+        print "Filtering"
+        print time.time()
+        s = ns.data['id'] == 2
+        print type(s)
+        print sys.getsizeof(s)
         print time.time()
         lock.acquire()
-        data_to_return = data['Users'][2]
-        comms.send_message_over_connection("")
+
+        comms.send_message_over_connection(ns.data.iloc[0].to_json())
         s = 0
         #for key in data:
         #    print "Key %s, Value %s" % (key)
@@ -81,7 +98,8 @@ def messages(data, lock, logger):
 def main():
     # Global variables
     manager = Manager()
-    data = manager.dict()
+    ns = manager.Namespace()
+    ns.data = pandas.DataFrame()
     lock = manager.Lock()
 
     # Setup the logger
@@ -96,8 +114,8 @@ def main():
         sys.exit(1)
 
     # Main loop
-    p1 = Process(target=query_sources, args=(data,lock, config, logger))
-    p2 = Process(target=messages, args=(data, lock, logger))
+    p1 = Process(target=query_sources, args=(ns, lock, config, logger))
+    p2 = Process(target=messages, args=(ns, lock, logger))
     p1.start()
     p2.start()
     p1.join()
